@@ -91,7 +91,7 @@ all_data_split<-split(all_data_subject,all_data_subject$`Subject#`)
 
 
 ## Loop that groups the splitted database by Activity Label AND applies the mean of mean AND sd
-
+library(dplyr)
 l<-data.frame()
 for(i in 1:length(all_data_split)){
         s<-summarize(group_by(all_data_split[[i]],Labels),"Mean"=mean(Mean))
