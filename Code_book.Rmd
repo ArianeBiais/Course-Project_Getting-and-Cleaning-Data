@@ -1,30 +1,180 @@
 ---
-title: "Code_book"
+title: "Code_book for Course Project"
 author: "ME"
 date: "30/07/2020"
 output: html_document
 ---
 
+# Introduction 
+This code book describes the variables, the data, and any transformations or work that I performed to clean up the data.
+
+# Step 1 - Getting and understanding the data
+The main difficulty of the assignment was to understand all files and how they were answering (or not) the requirements.
+After downloading and unzipping the file provided for the assignment, I  spent a bit of time using the functions "str", "dim", "class" and "View" just to understand how all files and sets of data were related.
+
+# Step 2 - Merging the training and the test sets to create one data set
+
+In order to perform this question, the main task to do was to extract the data for the TRAIN set (values AND lables = 2 files), and the data for the TEST set (values AND lables = 2 files). So 4 files in total. I used the following code :
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+##Creating the dataset "train" by merging values AND labels
+setwd("~/R/UCI HAR Dataset/train")
+trainlabels<-readLines("y_train.txt")
+trainset<-readLines("X_train.txt")
+train<-cbind(trainlabels,trainset)
+train<-as.matrix(train)
+
+##Creating the dataset "test" by merging values AND labels
+setwd("~/R/UCI HAR Dataset/test")
+testlabels<-readLines("y_test.txt")
+testset<-readLines("X_test.txt")
+test<-cbind(testlabels,testset)
+test<-as.matrix(test)
 ```
 
-## R Markdown
+As you can see, I merged the labels columns with the values columns in order to have for each value the related activity number on the same line. I did this for the train set AND the test set, then I changed the classes of those two variables to have dataframes.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+I just needed then to merge the TEST and TRAIN data frames and to rename columns to understand the variables.
+I then created the variable alldata, refering to the complete matrix with all values and labels.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r setup, include=FALSE}
+## Merging train dataset & test dataset (containing values and labels)
+alldata<-rbind(test,train)
 
-```{r cars}
-summary(cars)
+##Changing columns' names
+alldata<-as.data.frame(alldata)
+colnames(alldata)<-c("Labels","Set")
 ```
 
-## Including Plots
+# Step 3 - Dividing the columns with numerous measurements into a matrix with one column per measurement
+By using the function "View" on the ALLDATA matrix, I realized I was far from having a clean dataset with separate measurements. In deed, for one row, I had several measurements separated by a blank in the "Set" column !
+My goal was then to use the package "stringr" to try to split my column into values and deleted all " " values.
+The following code helped me to achieve this :
 
-You can also embed plots, for example:
+```{r setup, include=FALSE}
+## Dividing the "set" into measurements : one column per measurement
+library(stringr)
+m<-str_split(alldata$Set," ")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Delete values of m that are equal to ""
+i<-1
+while (i<=nrow(alldata)){
+        m[[i]]<-m[[i]][-which(m[[i]]=="")]
+        i<-i+1
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+I then tried to apply mean and standard deviations functions, but then I realized that my values were characters and not numerics ! See the following code that I used to change this :
+```{r setup, include=FALSE}
+## Transform characters into numeric values
+l<-1
+while (l<=nrow(alldata)){
+        m[[l]]<-as.numeric(m[[l]])
+        l<-l+1
+}
+```
+
+
+# Step 4 - Extracting only the measurements on the mean and standard deviation for each measurement.
+Ok, then all was left to do was to create two loops that created two matrices computing the mean and standard deviations for each row and then merge the two matrices in the final one
+
+```{r setup, include=FALSE}
+## Create 2 dataframes with the mean and standard deviation for all set of measures
+i<-1
+mean_data<-data.frame()
+while (i <=nrow(alldata)){
+        mean_data<-rbind(mean(m[[i]]),mean_data)
+        i<-i+1
+}
+colnames(mean_data)="Mean"
+
+i<-1
+sd_data<-data.frame()
+while (i <=10299){
+        sd_data<-rbind(sd(m[[i]]),sd_data)
+        i<-i+1}
+colnames(sd_data)="Standard_deviation"
+```
+
+And then merging the SD_DATA and the MEAN_DATA in one dataset :
+
+```{r setup, include=FALSE}
+alldata<-cbind(alldata,mean_data,sd_data)
+```
+
+# Step 5 : Uses descriptive activity names to name the activities in the data set
+If you remember, the activity (standing, walking...) were not described with a word in the ALLDATA variable, but with a number. I then used the readLines function to read the "activity _lables.text" to know which activity name was to assign to which number. 
+I used the gsub functio  to replace numbers by activity names :
+```{r setup, include=FALSE}
+alldata$Labels<-gsub("6","LAYING",alldata$Labels)
+alldata$Labels<-gsub("5","STANDING",alldata$Labels)
+alldata$Labels<-gsub("4","SITTING",alldata$Labels)
+alldata$Labels<-gsub("3","WALKING_DOWNSTAIRS",alldata$Labels)
+alldata$Labels<-gsub("2","WALKING_UPSTAIRS",alldata$Labels)
+alldata$Labels<-gsub("1","WALKING",alldata$Labels)
+```
+
+
+# Step 6 : Downloading the final dataset 
+```{r setup, include=FALSE}
+##Download the final dataset
+final_data<-alldata[,-2]
+setwd("~/R")
+write.csv(final_data,file="./tidydataset.csv")
+```
+
+# Step 7 : Assign a subject number to each row of the FINAL_DATA
+From the data set in step 6, the assignment was then to create a second, independent tidy data set with the average of each variable for each activity and each subject.
+The problem was that my cleaned data set did not contained the subject # in front of each row ! So I had to extract the subject# of test AND train sets and write them in front of each row in a separate columns.
+
+```{r setup, include=FALSE}
+## Get the subject # values and create a binded data set with train and test sets
+setwd("~/R/UCI HAR Dataset/train")
+train_subject<-readLines("subject_train.txt")
+setwd("~/R/UCI HAR Dataset/test")
+test_subject<-readLines("subject_test.txt")
+test_subject<-as.data.frame(test_subject)
+train_subject<-as.data.frame(train_subject)
+colnames(test_subject)<-"Subject#"
+colnames(train_subject)<-"Subject#"
+subject_data<-rbind(test_subject,train_subject)
+colnames(subject_data)<-"Subject#"
+```
+
+After checking that my tidydataset had the same number of rows of my newly created SUBJECT_DATA matrix, I cbinded both of them :
+```{r setup, include=FALSE}
+
+setwd("~/R/UCI HAR Dataset/test")
+tidydata<-read.csv("tidydataset.csv",sep=";")
+all_data_subject<-cbind(subject_data,tidydata)
+all_data_subject<-all_data_subject[,-2]
+```
+
+# Step 8 : Separate the ALL_DATA_SUBJECT by Subject number AND by Labels to apply mean of mean and sd
+
+```{r setup, include=FALSE}
+##Split the database by subject #
+all_data_split<-split(all_data_subject,all_data_subject$`Subject#`)
+```
+
+With the code above I obtained a list that, for all subject number, listed all values of mean and standard deviation for all 6 activities. Using the knowledge learned with the course content, I grouped all element of the list according to the activity, and applying the mean function. I needed a loop, and several functions : summarize, group-by.
+
+```{r setup, include=FALSE}
+library(dplyr)
+l<-data.frame()
+for(i in 1:length(all_data_split)){
+        s<-summarize(group_by(all_data_split[[i]],Labels),"Mean"=mean(Mean))
+        w<-summarize(group_by(all_data_split[[i]],Labels),mean(Standard_deviation))
+        s<-as.data.frame(s)
+        w<-as.data.frame(w)
+        sw<-cbind(s,"Sd_mean"=w[,2])
+        subject_nb<-matrix(i,6,1)
+        s2<-cbind(sw,subject_nb)
+        l<-rbind(l,s2)
+}
+```
+
+# Step 9 : Dowloading the second data set with the average of each variable for each activity and each subject.
+```{r setup, include=FALSE}
+setwd("~/R")
+write.csv(l,file="./tidydataset2.csv")
+```
